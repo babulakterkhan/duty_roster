@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <title>Advanced Duty Roster - Smart Merge Fixed</title>
+    <style>
+        body { font-family: 'SolaimanLipi', Arial, sans-serif; background-color: #f4f7f6; padding: 20px; }
+        .no-print { background: #fff; padding: 20px; border-radius: 8px; max-width: 950px; margin: 0 auto 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
+        .container { width: 100%; max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border: 1px solid #000; }
+        
+        .inst-info { text-align: center; margin-bottom: 10px; }
+        .inst-info h2 { margin: 0; font-size: 18px; }
+        
+        .roster-title { text-align: center; margin-bottom: 20px; border-top: 2px solid #000; border-bottom: 2px solid #000; padding: 10px 0; }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #000; padding: 8px; text-align: center; font-size: 14px; }
+        th { background-color: #f2f2f2; }
+        
+        input, select { width: 98%; border: none; text-align: center; font-size: 14px; background: transparent; outline: none; font-family: inherit; }
+        
+        .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+        .sig-box { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 5px; font-weight: bold; }
+
+        @media print {
+            @page { margin: 2mm 10mm; size: auto; }
+            .no-print { display: none; }
+            body { padding: 0; background: white; }
+            .container { border: none; width: 100%; padding: 0; }
+            select { appearance: none; -webkit-appearance: none; color: black; }
+        }
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; color: #fff; cursor: pointer; margin: 5px; font-weight: bold; }
+        .config-label { font-weight: bold; display: block; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div id="login-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+  <h3>অনুগ্রহ করে পাসওয়ার্ড দিন</h3>
+  <input type="password" id="pass-input" style="padding:10px; margin-bottom:10px; border-radius:5px; border:1px solid #ccc;">
+  <button onclick="checkPass()" style="padding:10px 20px; cursor:pointer; background:#28a745; color:white; border:none; border-radius:5px;">Login</button>
+  <p id="error-msg" style="color:red; display:none;">ভুল পাসওয়ার্ড!</p>
+</div>
+
+<script>
+function checkPass() {
+  const input = document.getElementById('pass-input').value;
+  const correctPass = "12345678"; // আপনার পাসওয়ার্ড এখানে লিখুন
+  
+  if (input === correctPass) {
+    document.getElementById('login-screen').style.display = 'none';
+  } else {
+    document.getElementById('error-msg').style.display = 'block';
+  }
+}
+</script>
+<div class="no-print">
+    <h4>রোস্টার কনফিগারেশন</h4>
+    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+        <div>
+            <span class="config-label">শিক্ষকদের তালিকা (কমা দিয়ে লিখুন)</span>
+            <textarea id="staffList" style="width: 250px; height: 60px;" oninput="refreshAllSelects(); saveRoster()">শিক্ষক ১, শিক্ষক ২, শিক্ষক ৩</textarea>
+        </div>
+        <div>
+            <span class="config-label">পদবী তালিকা</span>
+            <textarea id="desigList" style="width: 250px; height: 60px;" oninput="refreshAllSelects(); saveRoster()">প্রভাষক, সহকারী শিক্ষক, সিনিয়র শিক্ষক, প্রদর্শক</textarea>
+        </div>
+        <div>
+            <span class="config-label">প্রতিষ্ঠান তালিকা</span>
+            <textarea id="orgList" style="width: 250px; height: 60px;" oninput="refreshAllSelects(); saveRoster()">নিজ প্রতিষ্ঠান, কলেজ এ, স্কুল বি</textarea>
+        </div>
+    </div>
+    <br>
+    <button class="btn" style="background: #2196F3;" onclick="addNewRow()">+ নতুন সারি</button>
+    <button class="btn" style="background: #ff9800;" onclick="mergeRooms()">স্মার্ট মার্জ (কক্ষ)</button>
+    <button class="btn" style="background: #4CAF50;" onclick="window.print()">প্রিন্ট করুন</button>
+    <button class="btn" style="background: #f44336;" onclick="resetRoster()">রিসেট করুন</button>
+</div>
+
+<div class="container">
+    <div class="inst-info">
+        <h3 id="instName" contenteditable="true" oninput="saveRoster()">প্রতিষ্ঠানের নাম</h3>
+        <p id="instSub" contenteditable="true" oninput="saveRoster()">ঠিকানা ও পরীক্ষার কেন্দ্র কোড</p>
+    </div>
+
+    <div class="roster-title">
+        <h4>পরীক্ষক ও পরিদর্শক ডিউটি রোস্টার</h4>
+        <p>
+            <b>পরীক্ষা:</b> <span id="exName" contenteditable="true" oninput="saveRoster()">................</span> 
+            || <b>তারিখ:</b> <span id="exDate" contenteditable="true" oninput="saveRoster()">................</span>
+        </p>
+    </div>
+
+    <table id="rosterTable">
+        <thead>
+            <tr>
+                <th width="16%">কক্ষ নং</th>
+                <th width="20%">শিক্ষকের নাম</th>
+                <th width="12%">পদবী</th>
+                <th width="20%">প্রতিষ্ঠান</th>
+                <th width="12%">মোবাইল নং</th>
+                <th width="20%">স্বাক্ষর</th>
+            </tr>
+        </thead>
+        <tbody id="roster-body"></tbody>
+    </table>
+
+    <div class="footer">
+        <div class="sig-box">সদস্য সচিব</div>
+        <div class="sig-box">ভারপ্রাপ্ত কর্মকর্তা / অধ্যক্ষ</div>
+    </div>
+</div>
+
+<script>
+    function getOptions(id, defaultText) {
+        const val = document.getElementById(id).value.split(',');
+        let html = `<option value="">${defaultText}</option>`;
+        val.forEach(n => { if(n.trim()) html += `<option>${n.trim()}</option>`; });
+        return html;
+    }
+
+    function refreshAllSelects() {
+        document.querySelectorAll('.r-name').forEach(s => { const v = s.value; s.innerHTML = getOptions('staffList', 'নাম নির্বাচন'); s.value = v; });
+        document.querySelectorAll('.r-desig').forEach(s => { const v = s.value; s.innerHTML = getOptions('desigList', 'পদবী'); s.value = v; });
+        document.querySelectorAll('.r-org').forEach(s => { const v = s.value; s.innerHTML = getOptions('orgList', 'প্রতিষ্ঠান'); s.value = v; });
+    }
+
+    function addNewRow(data = null) {
+        const tbody = document.getElementById('roster-body');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="room-td"><input type="text" class="r-room" oninput="unmergeRooms(); saveRoster()" value="${data?data.room:''}"></td>
+            <td><select class="r-name" onchange="saveRoster()">${getStaffOptions()}</select></td>
+            <td><select class="r-desig" onchange="saveRoster()">${getDesigOptions()}</select></td>
+            <td><select class="r-org" onchange="saveRoster()">${getOrgOptions()}</select></td>
+            <td><input type="text" class="r-phone" oninput="saveRoster()" value="${data?data.phone:''}"></td>
+            <td></td>
+        `;
+        if(data) {
+            tr.querySelector('.r-name').value = data.name;
+            tr.querySelector('.r-desig').value = data.desig;
+            tr.querySelector('.r-org').value = data.org;
+        }
+        tbody.appendChild(tr);
+    }
+
+    function getStaffOptions() { return getOptions('staffList', 'নাম নির্বাচন'); }
+    function getDesigOptions() { return getOptions('desigList', 'পদবী'); }
+    function getOrgOptions() { return getOptions('orgList', 'প্রতিষ্ঠান'); }
+
+    // মার্জ রিসেট করার ফাংশন
+    function unmergeRooms() {
+        const rows = document.getElementById('roster-body').rows;
+        for(let r of rows) {
+            r.cells[0].style.display = '';
+            r.cells[0].rowSpan = 1;
+        }
+    }
+
+    // স্মার্ট মার্জ ফাংশন
+    function mergeRooms() {
+        unmergeRooms();
+        const rows = document.getElementById('roster-body').rows;
+        if (rows.length < 2) return;
+
+        for (let i = 0; i < rows.length; i++) {
+            let currentVal = rows[i].querySelector('.r-room').value.trim();
+            if (currentVal === "") continue;
+
+            let span = 1;
+            for (let j = i + 1; j < rows.length; j++) {
+                let nextVal = rows[j].querySelector('.r-room').value.trim();
+                if (nextVal === currentVal && currentVal !== "") {
+                    span++;
+                    rows[j].cells[0].style.display = 'none';
+                } else {
+                    break;
+                }
+            }
+            if (span > 1) {
+                rows[i].cells[0].rowSpan = span;
+                i += (span - 1);
+            }
+        }
+    }
+
+    function saveRoster() {
+        const data = {
+            name: document.getElementById('instName').innerText,
+            sub: document.getElementById('instSub').innerText,
+            ex: document.getElementById('exName').innerText,
+            dt: document.getElementById('exDate').innerText,
+            list: document.getElementById('staffList').value,
+            dList: document.getElementById('desigList').value,
+            oList: document.getElementById('orgList').value,
+            rows: []
+        };
+        document.querySelectorAll('#roster-body tr').forEach(tr => {
+            data.rows.push({
+                room: tr.querySelector('.r-room').value,
+                name: tr.querySelector('.r-name').value,
+                desig: tr.querySelector('.r-desig').value,
+                org: tr.querySelector('.r-org').value,
+                phone: tr.querySelector('.r-phone').value
+            });
+        });
+        localStorage.setItem('duty_roster_v2', JSON.stringify(data));
+    }
+
+    function loadRoster() {
+        const saved = localStorage.getItem('duty_roster_v2');
+        if(saved) {
+            const data = JSON.parse(saved);
+            document.getElementById('instName').innerText = data.name;
+            document.getElementById('instSub').innerText = data.sub;
+            document.getElementById('exName').innerText = data.ex;
+            document.getElementById('exDate').innerText = data.dt;
+            document.getElementById('staffList').value = data.list;
+            document.getElementById('desigList').value = data.dList || "";
+            document.getElementById('orgList').value = data.oList || "";
+            if(data.rows.length > 0) {
+                data.rows.forEach(r => addNewRow(r));
+            } else {
+                addNewRow();
+            }
+        } else { addNewRow(); }
+    }
+
+    function resetRoster() {
+        if(confirm("সব ডাটা মুছবেন?")) { localStorage.removeItem('duty_roster_v2'); location.reload(); }
+    }
+
+    window.onload = loadRoster;
+</script>
+</body>
+</html>
